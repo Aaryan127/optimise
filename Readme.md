@@ -9,6 +9,7 @@
 
 ## Your task with Locotransformer:
 - [ ] Check if the implementation can run on your system as is.
+      - [ ] Use `uv` and `micromamba` for package management and installations - should be fine.
 - [ ] Make necessary changes so that it runs along with mujoco on your system - do not worry about performance at this stage, get it working first.
 - [ ] Train the policy and evaluate the results.
 - [ ] The policy will (mostly) perform very poorly, in case you much think of specific changes you will make to the architecture/training setup to improve it.

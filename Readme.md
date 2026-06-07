@@ -1,3 +1,5 @@
+The idea is to improve the RL based transformer policy - [LocoTransformer](https://rchalyang.github.io/LocoTransformer/)
+
 ## Core Highlights of the LocoTransformer:
 
 - **Cross-Modal Tokenization:** Notice how the `LocoTransformerEncoder` treats the proprioceptive state as a single token while breaking visual feature maps into spatial tokens. This allows the transformer to learn dependencies between robot pose and specific environmental obstacles.

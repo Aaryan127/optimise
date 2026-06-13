@@ -187,12 +187,33 @@ This repository is a product of our work on [LocoTransformer](https://rchalyang.
 
 
 
+# LocoTransformer Optimisation Proposals
+
+---
+
+## Preliminary Note: Actual Token Dimension
+
+All proposals below use the correct `encoder.visual_dim = 64`, which is the value actually set
+by `LocoTransformerEncoder` in `base.py`:
+
+```python
+self.visual_dim = token_dim   # token_dim defaults to 64
+```
+
+The field `"visual_dim": 256` in the `encoder` block of `thin.json` is passed as `**kwargs`
+and silently discarded by `LocoTransformerEncoder`. It has no effect on model architecture.
+If you intend to change the token dimension, set `"token_dim"` in the encoder config instead.
+
+All dimension figures in this document reflect the true value of 64.
+
+---
 
 ## 1. Multi-Head Attention Enhancement
 
 ### Objective
 
-Increase the number of attention heads in the LocoTransformer architecture from 1 to 2 per transformer layer.
+Increase the number of attention heads in the LocoTransformer architecture from 1 to 2 per
+transformer layer.
 
 ### Files Modified
 
@@ -202,8 +223,8 @@ Increase the number of attention heads in the LocoTransformer architecture from 
 
 ```json
 "transformer_params": [
-    [1,256],
-    [1,256]
+    [1, 256],
+    [1, 256]
 ]
 ```
 
@@ -211,16 +232,19 @@ Increase the number of attention heads in the LocoTransformer architecture from 
 
 ```json
 "transformer_params": [
-    [2,256],
-    [2,256]
+    [2, 256],
+    [2, 256]
 ]
 ```
 
 ### Motivation
 
-The baseline LocoTransformer architecture uses a single attention head in each transformer layer. While functional, a single attention head can only learn one dominant interaction pattern between the robot state token and visual terrain tokens.
+The baseline LocoTransformer architecture uses a single attention head in each transformer
+layer. While functional, a single attention head can only learn one dominant interaction
+pattern between the robot state token and visual terrain tokens.
 
-Multi-head attention allows the model to learn multiple independent relationships simultaneously. Different heads may specialize in different aspects of locomotion, such as:
+Multi-head attention allows the model to learn multiple independent relationships
+simultaneously. Different heads may specialise in different aspects of locomotion, such as:
 
 * Terrain assessment
 * Foothold selection
@@ -228,13 +252,22 @@ Multi-head attention allows the model to learn multiple independent relationship
 * Obstacle awareness
 * Velocity and balance regulation
 
-This can potentially improve cross-modal fusion between proprioceptive state information and visual observations.
+This can potentially improve cross-modal fusion between proprioceptive state information and
+visual observations.
+
+### Dimensional Validity
+
+`nn.TransformerEncoderLayer` requires `d_model % n_head == 0`. The `d_model` here is
+`encoder.visual_dim = 64`. With `n_head = 2`: `64 % 2 = 0`. ✓
+
+The `256` in `transformer_params` is `dim_feedforward`, which is independent of `n_head`
+and imposes no constraint.
 
 ### Expected Benefits
 
 * Richer token interactions
 * Improved representation learning
-* Better utilization of visual terrain information
+* Better utilisation of visual terrain information
 * Increased model expressiveness with minimal code modification
 
 ### Implementation Complexity
@@ -243,9 +276,11 @@ Low
 
 ### Code Changes Required
 
-Only the transformer configuration values need to be changed. No modifications to the actor, critic, PPO implementation, or transformer source code are required because the architecture already supports arbitrary attention head counts through configuration parameters.
+Only the transformer configuration values need to be changed. No modifications to the actor,
+critic, PPO implementation, or transformer source code are required because the architecture
+already supports arbitrary attention head counts through configuration parameters.
 
-
+---
 
 ## 2. Additional Transformer Layer
 
@@ -261,8 +296,8 @@ Increase transformer depth from two encoder layers to three encoder layers.
 
 ```json
 "transformer_params": [
-    [1,256],
-    [1,256]
+    [1, 256],
+    [1, 256]
 ]
 ```
 
@@ -270,19 +305,24 @@ Increase transformer depth from two encoder layers to three encoder layers.
 
 ```json
 "transformer_params": [
-    [1,256],
-    [1,256],
-    [1,256]
+    [1, 256],
+    [1, 256],
+    [1, 256]
 ]
 ```
 
 ### Motivation
 
-The baseline LocoTransformer architecture uses two transformer encoder layers to model interactions between the robot state token and visual terrain tokens.
+The baseline LocoTransformer architecture uses two transformer encoder layers to model
+interactions between the robot state token and visual terrain tokens.
 
-Increasing transformer depth allows information to be refined across additional stages of self-attention. Earlier layers can learn low-level state-terrain relationships while deeper layers can potentially capture more abstract locomotion patterns and environmental structure.
+Increasing transformer depth allows information to be refined across additional stages of
+self-attention. Earlier layers can learn low-level state-terrain relationships while deeper
+layers can potentially capture more abstract locomotion patterns and environmental structure.
 
-Since each transformer layer performs additional rounds of token interaction, increasing depth may improve the quality of cross-modal feature fusion and provide richer internal representations for downstream action generation.
+Since each transformer layer performs additional rounds of token interaction, increasing depth
+may improve the quality of cross-modal feature fusion and provide richer internal
+representations for downstream action generation.
 
 ### Expected Benefits
 
@@ -304,15 +344,13 @@ Low
 
 ### Code Changes Required
 
-Only the transformer configuration requires modification. The architecture dynamically constructs transformer layers from the `transformer_params` list, therefore no changes to the actor, critic, PPO implementation, or transformer source code are required.
+Only the transformer configuration requires modification. The architecture dynamically
+constructs transformer layers from the `transformer_params` list, therefore no changes to the
+actor, critic, PPO implementation, or transformer source code are required.
 
 ### Verification Audit
 
-The transformer stack is constructed dynamically inside:
-
-`torchrl/networks/nets.py`
-
-using:
+The transformer stack is constructed dynamically inside `torchrl/networks/nets.py`:
 
 ```python
 for n_head, dim_feedforward in transformer_params:
@@ -322,13 +360,14 @@ for n_head, dim_feedforward in transformer_params:
 
 No assumptions regarding a fixed number of transformer layers were found during inspection.
 
-
+---
 
 ## 3. Increased Transformer Feedforward Capacity
 
 ### Objective
 
-Increase the feedforward network dimension inside each transformer encoder layer from 256 to 512.
+Increase the feedforward network dimension inside each transformer encoder layer from 256
+to 512.
 
 ### Files Modified
 
@@ -338,8 +377,8 @@ Increase the feedforward network dimension inside each transformer encoder layer
 
 ```json
 "transformer_params": [
-    [1,256],
-    [1,256]
+    [1, 256],
+    [1, 256]
 ]
 ```
 
@@ -347,18 +386,28 @@ Increase the feedforward network dimension inside each transformer encoder layer
 
 ```json
 "transformer_params": [
-    [1,512],
-    [1,512]
+    [1, 512],
+    [1, 512]
 ]
 ```
 
 ### Motivation
 
-Each transformer encoder layer contains an internal feedforward network that processes token representations after the attention operation.
+Each transformer encoder layer contains an internal feedforward network that processes token
+representations after the attention operation. In the baseline architecture, this feedforward
+dimension is set to 256. Increasing it to 512 provides greater representational capacity and
+allows the transformer to learn more complex state-terrain relationships.
 
-In the baseline architecture, the feedforward dimension is set to 256. Increasing this dimension to 512 provides greater representational capacity and allows the transformer to learn more complex state-terrain relationships.
+While attention determines which tokens should interact, the feedforward network determines
+how those interactions are transformed into useful features. Expanding this component may
+improve the quality of learned locomotion representations.
 
-While attention determines which tokens should interact, the feedforward network determines how those interactions are transformed into useful features. Expanding this component may improve the quality of learned locomotion representations.
+### Dimensional Note
+
+`dim_feedforward` is the internal FFN width within each `TransformerEncoderLayer`. It is
+entirely independent of `d_model` (`encoder.visual_dim = 64`) and imposes no constraint on
+other dimensions. Changing it from 256 to 512 has no effect on input or output shapes of
+the transformer stack.
 
 ### Expected Benefits
 
@@ -379,9 +428,8 @@ Low
 
 ### Code Changes Required
 
-Only the transformer configuration requires modification.
-
-No changes to the actor, critic, PPO implementation, transformer source code, or encoder architecture are necessary.
+Only the transformer configuration requires modification. No changes to the actor, critic,
+PPO implementation, transformer source code, or encoder architecture are necessary.
 
 ### Verification Audit
 
@@ -389,19 +437,16 @@ The feedforward dimension is dynamically supplied to:
 
 ```python
 nn.TransformerEncoderLayer(
-    visual_append_input_shape,
+    visual_append_input_shape,   # d_model = encoder.visual_dim = 64
     n_head,
-    dim_feedforward
+    dim_feedforward              # this value, independent of d_model
 )
 ```
 
-inside:
+inside `torchrl/networks/nets.py`. No hardcoded dependency on a feedforward size of 256 was
+found during inspection.
 
-`torchrl/networks/nets.py`
-
-No hardcoded dependency on a feedforward size of 256 was found during inspection.
-
-
+---
 
 ## 4. Max Pooling Token Aggregation
 
@@ -418,13 +463,10 @@ Replace mean pooling of transformer output tokens with max pooling.
 ```json
 "net": {
     "transformer_params": [
-        [1,256],
-        [1,256]
+        [1, 256],
+        [1, 256]
     ],
-    "append_hidden_shapes": [
-        256,
-        256
-    ]
+    "append_hidden_shapes": [256, 256]
 }
 ```
 
@@ -433,26 +475,22 @@ Replace mean pooling of transformer output tokens with max pooling.
 ```json
 "net": {
     "transformer_params": [
-        [1,256],
-        [1,256]
+        [1, 256],
+        [1, 256]
     ],
-    "append_hidden_shapes": [
-        256,
-        256
-    ],
+    "append_hidden_shapes": [256, 256],
     "max_pool": true
 }
 ```
 
 ### Motivation
 
-The baseline LocoTransformer aggregates visual transformer tokens using mean pooling.
-
-Mean pooling treats every visual token equally and averages their representations into a single feature vector.
-
-However, during locomotion, a small number of highly relevant terrain tokens may contain critical information regarding obstacles, footholds, gaps, or unstable terrain. Averaging all tokens may dilute these important signals.
-
-Max pooling preserves the strongest activation across tokens and allows the network to focus on the most salient terrain features.
+The baseline LocoTransformer aggregates visual transformer tokens using mean pooling, which
+treats every visual token equally and averages their representations into a single feature
+vector. However, during locomotion a small number of highly relevant terrain tokens may
+contain critical information regarding obstacles, footholds, gaps, or unstable terrain.
+Averaging all tokens may dilute these important signals. Max pooling preserves the strongest
+activation across tokens, allowing the network to focus on the most salient terrain features.
 
 ### Expected Benefits
 
@@ -473,56 +511,32 @@ Very Low
 
 ### Code Changes Required
 
-No Python source code modifications are required.
-
-The implementation already exists inside:
-
-`torchrl/networks/nets.py`
-
-through:
+No Python source code modifications are required. The implementation already exists inside
+`torchrl/networks/nets.py` in `LocoTransformer.forward()`:
 
 ```python
 if self.max_pool:
-    out_first = ...
+    out_first = out[1: 1 + self.per_modal_tokens, ...].max(dim=0)[0]
 else:
-    out_first = ...
+    out_first = out[1: 1 + self.per_modal_tokens, ...].mean(dim=0)
 ```
 
-The feature is activated by passing:
-
-```json
-"max_pool": true
-```
-
-through the network configuration.
+The feature is activated by passing `"max_pool": true` through the network configuration.
 
 ### Verification Audit
 
-The `LocoTransformer` and `Transformer` constructors both expose:
+The `LocoTransformer` constructor exposes `max_pool=False` and receives parameters through
+`**params["net"]` from `starter/ppo_locotransformer.py`. The pooling slicing correctly
+excludes the state token (index 0) and operates only over terrain tokens
+`out[1: 1 + self.per_modal_tokens, ...]`. No additional modifications are necessary.
 
-```python
-max_pool=False
-```
+---
 
-and receive parameters through:
-
-```python
-**params["net"]
-```
-
-from:
-
-`starter/ppo_locotransformer.py`
-
-No additional modifications were found to be necessary.
-
-
-
-## 5. Token-Level Layer Normalization
+## 5. Token-Level Layer Normalisation
 
 ### Objective
 
-Enable token normalization before transformer processing using Layer Normalization.
+Enable token normalisation before transformer processing using Layer Normalisation.
 
 ### Files Modified
 
@@ -533,13 +547,10 @@ Enable token normalization before transformer processing using Layer Normalizati
 ```json
 "net": {
     "transformer_params": [
-        [1,256],
-        [1,256]
+        [1, 256],
+        [1, 256]
     ],
-    "append_hidden_shapes": [
-        256,
-        256
-    ]
+    "append_hidden_shapes": [256, 256]
 }
 ```
 
@@ -548,33 +559,39 @@ Enable token normalization before transformer processing using Layer Normalizati
 ```json
 "net": {
     "transformer_params": [
-        [1,256],
-        [1,256]
+        [1, 256],
+        [1, 256]
     ],
-    "append_hidden_shapes": [
-        256,
-        256
-    ],
+    "append_hidden_shapes": [256, 256],
     "token_norm": true
 }
 ```
 
 ### Motivation
 
-Transformer architectures frequently benefit from feature normalization before attention operations.
+Transformer architectures frequently benefit from feature normalisation before attention
+operations. The LocoTransformer implementation already contains a token normalisation pathway
+based on Layer Normalisation but leaves it disabled by default. Enabling it standardises
+token feature distributions before attention processing, which may improve optimisation
+stability and reduce sensitivity to feature magnitude variations. This is particularly useful
+when combining heterogeneous information sources such as proprioceptive state features and
+visual terrain features.
 
-The LocoTransformer implementation already contains a token normalization pathway based on Layer Normalization but leaves it disabled by default.
+### Known Limitation
 
-Enabling token normalization standardizes token feature distributions before attention processing, which may improve optimization stability and reduce sensitivity to feature magnitude variations.
-
-This can be particularly useful when combining heterogeneous information sources such as proprioceptive state features and visual terrain features.
+`LocoTransformer.__init__()` creates both `self.token_ln` and `self.state_token_ln` when
+`token_norm=True`, but `forward()` only applies `self.token_ln` to the full token sequence.
+`self.state_token_ln` is defined but never called. As a result, the state token is not
+independently normalised even when this flag is enabled. This is a latent incompleteness in
+the original codebase and will not cause any runtime error, but it means the state token
+bypasses the normalisation that `self.state_token_ln` was presumably intended to provide.
 
 ### Expected Benefits
 
 * Improved training stability
 * Better-conditioned token representations
 * Reduced feature-scale sensitivity
-* Potentially improved attention behavior
+* Potentially improved attention behaviour
 
 ### Expected Drawbacks
 
@@ -587,20 +604,16 @@ Very Low
 
 ### Code Changes Required
 
-No Python source code modifications are required.
-
-The functionality is already implemented inside:
-
-`torchrl/networks/nets.py`
-
-through:
+No Python source code modifications are required to enable this feature. The functionality
+is already implemented inside `torchrl/networks/nets.py`:
 
 ```python
 if self.token_norm:
     self.token_ln = nn.LayerNorm(self.encoder.visual_dim)
+    self.state_token_ln = nn.LayerNorm(self.encoder.visual_dim)  # defined but not applied
 ```
 
-and
+and in `forward()`:
 
 ```python
 if self.token_norm:
@@ -609,34 +622,13 @@ if self.token_norm:
 
 The feature can be enabled entirely through configuration.
 
-### Verification Audit
+---
 
-The `token_norm` parameter is exposed in both:
-
-```python
-class Transformer(...)
-class LocoTransformer(...)
-```
-
-and is forwarded automatically through:
-
-```python
-**params["net"]
-```
-
-from:
-
-`starter/ppo_locotransformer.py`
-
-No additional code modifications were found to be necessary.
-
-
-
-## 6. Post-Transformer Layer Normalization
+## 6. Post-Transformer Layer Normalisation
 
 ### Objective
 
-Enable Layer Normalization within the post-transformer MLP head.
+Enable Layer Normalisation within the post-transformer MLP head.
 
 ### Files Modified
 
@@ -647,13 +639,10 @@ Enable Layer Normalization within the post-transformer MLP head.
 ```json
 "net": {
     "transformer_params": [
-        [1,256],
-        [1,256]
+        [1, 256],
+        [1, 256]
     ],
-    "append_hidden_shapes": [
-        256,
-        256
-    ]
+    "append_hidden_shapes": [256, 256]
 }
 ```
 
@@ -662,31 +651,28 @@ Enable Layer Normalization within the post-transformer MLP head.
 ```json
 "net": {
     "transformer_params": [
-        [1,256],
-        [1,256]
+        [1, 256],
+        [1, 256]
     ],
-    "append_hidden_shapes": [
-        256,
-        256
-    ],
+    "append_hidden_shapes": [256, 256],
     "add_ln": true
 }
 ```
 
 ### Motivation
 
-After transformer processing and token aggregation, the resulting feature vector is passed through a multi-layer perceptron before generating actions and value estimates.
-
-The implementation already contains optional Layer Normalization blocks that can be inserted after each hidden layer of this MLP.
-
-Layer Normalization can stabilize feature distributions during training, improve optimization dynamics, and reduce sensitivity to feature magnitude variations.
-
-Unlike token normalization, which operates on transformer tokens, this modification normalizes features inside the final decision-making MLP.
+After transformer processing and token aggregation, the resulting feature vector is passed
+through a multi-layer perceptron before generating actions and value estimates. The
+implementation already contains optional Layer Normalisation blocks that can be inserted
+after each hidden layer of this MLP. Layer Normalisation can stabilise feature distributions
+during training, improve optimisation dynamics, and reduce sensitivity to feature magnitude
+variations. Unlike token normalisation (Proposal 5), which operates on transformer tokens,
+this modification normalises features inside the final decision-making MLP.
 
 ### Expected Benefits
 
 * More stable hidden activations
-* Improved optimization behavior
+* Improved optimisation behaviour
 * Better-conditioned feature representations
 * Potentially smoother PPO training
 
@@ -701,13 +687,8 @@ Very Low
 
 ### Code Changes Required
 
-No Python source code modifications are required.
-
-The implementation already exists inside:
-
-`torchrl/networks/nets.py`
-
-through:
+No Python source code modifications are required. The implementation already exists inside
+`torchrl/networks/nets.py`:
 
 ```python
 if self.add_ln:
@@ -716,32 +697,18 @@ if self.add_ln:
     )
 ```
 
-The feature can be enabled entirely through configuration.
+Inspection confirmed that Layer Normalisation is inserted only within the post-transformer
+MLP stack and does not modify the transformer attention layers, visual encoder, state
+tokeniser, or PPO implementation.
 
-### Verification Audit
-
-Inspection confirmed that Layer Normalization is inserted only within the post-transformer MLP stack and does not modify:
-
-* Transformer attention layers
-* Visual encoder
-* State tokenizer
-* PPO implementation
-
-Activation is achieved through:
-
-```json
-"add_ln": true
-```
-
-within the network configuration.
-
-
+---
 
 ## 7. Mean + Max Pool Fusion
 
 ### Objective
 
-Replace single mean-pooled terrain aggregation with a combined mean-pooled and max-pooled terrain representation.
+Replace single mean-pooled terrain aggregation with a combined mean-pooled and max-pooled
+terrain representation.
 
 ### Files Modified
 
@@ -749,12 +716,12 @@ Replace single mean-pooled terrain aggregation with a combined mean-pooled and m
 
 ### Original Architecture
 
-```text
+```
 Terrain Tokens
 ↓
-Mean Pool
+Mean Pool  →  64-dim vector
 ↓
-State Token + Mean Terrain Token
+[state_token (64) | mean_terrain (64)]  →  128-dim MLP input
 ↓
 MLP
 ↓
@@ -763,12 +730,13 @@ Action / Value Output
 
 ### Proposed Architecture
 
-```text
+```
 Terrain Tokens
 ↓
-Mean Pool + Max Pool
+Mean Pool  →  64-dim vector
+Max Pool   →  64-dim vector
 ↓
-State Token + Mean Terrain Token + Max Terrain Token
+[state_token (64) | mean_terrain (64) | max_terrain (64)]  →  192-dim MLP input
 ↓
 MLP
 ↓
@@ -777,21 +745,37 @@ Action / Value Output
 
 ### Motivation
 
-The baseline LocoTransformer aggregates terrain information exclusively through mean pooling. While this captures overall terrain structure, it may dilute highly informative terrain features such as obstacles, edges, gaps, foothold candidates, or abrupt height changes.
+The baseline LocoTransformer aggregates terrain information exclusively through mean pooling.
+While this captures overall terrain structure, it may dilute highly informative terrain
+features such as obstacles, edges, gaps, foothold candidates, or abrupt height changes.
 
-By combining mean pooling and max pooling, the network receives both:
+By combining mean pooling and max pooling, the network receives both global terrain
+information and the strongest terrain activations simultaneously. This allows the policy to
+reason about overall terrain layout and the most critical local terrain features at the same
+time.
 
-* Global terrain information (mean pooling)
-* Strongest terrain activations (max pooling)
+The approach is inspired by aggregation strategies used in PointNet, PointNet++, Point
+Transformer, and Set Transformer, where mean-max fusion has demonstrated effectiveness in
+preserving both global context and highly informative local features.
 
-This allows the policy to simultaneously reason about overall terrain layout and the most critical local terrain features.
+### Dimension Analysis
 
-The approach is inspired by successful aggregation strategies used in:
+With `encoder.visual_dim = 64` (i.e. `token_dim = 64`):
 
-* PointNet
-* PointNet++
-* Point Transformer
-* Set Transformer
+| Component | Dimension |
+|-----------|-----------|
+| `out_state` (state token) | 64 |
+| `out_mean` (mean-pooled terrain) | 64 |
+| `out_max` (max-pooled terrain) | 64 |
+| **Total MLP input** | **192** |
+
+Current MLP input is `64 * 2 = 128` (state + mean). The proposed change increases this to
+`64 * 3 = 192` (state + mean + max), requiring the `* 2` multiplier in `__init__` to
+become `* 3`.
+
+If `in_channels == 16` (RGB + Depth, i.e. `self.second = True`), the same dual-pool logic
+applies to the second modality as well, and the additional `encoder.visual_dim` added for
+`self.second` must also be duplicated.
 
 ### Expected Benefits
 
@@ -803,8 +787,8 @@ The approach is inspired by successful aggregation strategies used in:
 
 ### Expected Drawbacks
 
-* Larger feature vector entering the MLP
-* Increased parameter count
+* Larger feature vector entering the MLP (128 → 192)
+* Increased parameter count in the first MLP layer
 * Slightly higher memory usage
 * Slightly longer training time
 
@@ -814,52 +798,57 @@ Medium
 
 ### Code Changes Required
 
-The terrain token aggregation logic must be modified to compute both mean-pooled and max-pooled terrain features.
+Two locations in `torchrl/networks/nets.py` must be modified.
 
-The downstream MLP input dimension must also be adjusted to account for the additional pooled feature vector.
+**Change 1 — `LocoTransformer.__init__()`, line 974**
 
-### Verification Audit
-
-Inspection of `torchrl/networks/nets.py` confirmed that:
+Update the MLP input dimension calculation to account for three concatenated vectors instead
+of two:
 
 ```python
-out_first = out[1: 1 + self.per_modal_tokens, ...].mean(dim=0)
+# ORIGINAL (line 974)
+visual_append_input_shape = visual_append_input_shape * 2
+
+# PROPOSED
+visual_append_input_shape = visual_append_input_shape * 3
 ```
 
-is currently the sole terrain aggregation operation.
+If `self.second` is True (RGB+Depth mode), the `self.second` branch below this line adds
+one extra `encoder.visual_dim`. For full consistency in dual-modality mode this should also
+be doubled, but for the standard single-modality (`in_channels=4`, depth-only) setup used
+by `thin.json`, only the `* 3` change is required.
 
-The resulting terrain representation is concatenated with the state token before entering the final MLP.
+**Change 2 — `LocoTransformer.forward()`, lines 1015-1022**
 
-Introducing both mean-pooled and max-pooled terrain representations increases the concatenated feature dimension from:
+Replace the existing conditional pooling block with unconditional dual pooling:
 
-```text
-256 (state)
-+ 256 (mean terrain)
-= 512
+```python
+# ORIGINAL
+out_state = out[0, ...]
+if self.max_pool:
+    out_first = out[1: 1 + self.per_modal_tokens, ...].max(dim=0)[0]
+else:
+    out_first = out[1: 1 + self.per_modal_tokens, ...].mean(dim=0)
+out_list = [out_state, out_first]
+
+# PROPOSED
+out_state = out[0, ...]
+out_mean  = out[1: 1 + self.per_modal_tokens, ...].mean(dim=0)
+out_max   = out[1: 1 + self.per_modal_tokens, ...].max(dim=0)[0]
+out_list  = [out_state, out_mean, out_max]
 ```
 
-to:
+With this change the `max_pool` config flag becomes redundant for this class (both pools are
+always computed). It can be left absent from the config or ignored.
 
-```text
-256 (state)
-+ 256 (mean terrain)
-+ 256 (max terrain)
-= 768
-```
-
-and therefore requires corresponding adjustments to the downstream MLP input dimensions.
-
-### Research Basis
-
-Mean-max fusion is widely used in token-set and point-cloud architectures where important local features can be diluted by averaging operations. The technique has demonstrated effectiveness in preserving both global context and highly informative local features.
-
-
+---
 
 ## 8. Learnable Positional Embeddings
 
 ### Objective
 
-Introduce learnable positional embeddings to provide explicit spatial information to transformer tokens.
+Introduce learnable positional embeddings to provide explicit spatial information to
+transformer tokens.
 
 ### Files Modified
 
@@ -867,48 +856,70 @@ Introduce learnable positional embeddings to provide explicit spatial informatio
 
 ### Original Architecture
 
-```text
-State Token
+```
+State Token (1)
 +
-Terrain Tokens
+Terrain Tokens (per_modal_tokens = 16)
+↓
+No positional information
 ↓
 Transformer
 ```
 
 ### Proposed Architecture
 
-```text
-State Token
+```
+State Token (1)
 +
-Terrain Tokens
+Terrain Tokens (per_modal_tokens = 16)
 +
-Learnable Positional Embeddings
+Learnable Positional Embeddings (17 × 1 × 64)
 ↓
 Transformer
 ```
 
 ### Motivation
 
-The baseline LocoTransformer architecture constructs a sequence consisting of one state token and multiple terrain tokens before passing them into the transformer encoder.
+The baseline LocoTransformer constructs a sequence consisting of one state token and multiple
+terrain tokens before passing them into the transformer encoder. Inspection of the codebase
+confirmed that no positional embeddings or positional encoding mechanisms exist anywhere in
+the tokenisation or transformer pipeline. The transformer therefore receives token content
+but has no explicit information about the spatial location of terrain patches.
 
-During inspection, no positional embeddings or positional encoding mechanisms were found within the tokenization or transformer pipeline.
+For locomotion tasks, spatial location is highly relevant because the robot must distinguish
+between terrain features in different regions of the visual field. Learnable positional
+embeddings allow the transformer to associate each token with a unique spatial position,
+improving its ability to reason about terrain layout and obstacle location.
 
-As a result, the transformer receives token content but lacks explicit information regarding the spatial location of terrain patches.
+Positional embeddings are a foundational component of modern transformer architectures
+including the original Transformer (Vaswani et al.), ViT, DeiT, BEiT, MAE, and DINO.
 
-For locomotion tasks, spatial location is highly relevant because the robot must distinguish between terrain features located in different regions of the visual field.
+### Token Count
 
-Learnable positional embeddings allow the transformer to associate each token with a unique spatial position, improving its ability to reason about terrain layout and obstacle location.
+With `two_by_two=False` (default), `per_modal_tokens = 16`. For `in_channels=4` (depth
+only, as configured by `thin.json`):
+
+```
+total_tokens = 1 (state) + 16 (depth terrain) = 17
+```
+
+For `in_channels=16` (RGB+Depth):
+
+```
+total_tokens = 1 (state) + 16 (depth) + 16 (rgb) = 33
+```
 
 ### Expected Benefits
 
 * Improved spatial awareness
-* Better terrain understanding
+* Better terrain layout understanding
 * More informative attention patterns
 * Enhanced state-terrain interaction
 
 ### Expected Drawbacks
 
-* Additional trainable parameters
+* Additional trainable parameters (`total_tokens × token_dim = 17 × 64 = 1088` parameters
+  for the standard depth-only setup)
 * Slightly increased model complexity
 
 ### Implementation Complexity
@@ -917,32 +928,38 @@ Medium
 
 ### Code Changes Required
 
-A learnable positional embedding tensor is introduced inside the token encoder and added to the token sequence prior to transformer processing.
+Two locations in `torchrl/networks/base.py` must be modified within `LocoTransformerEncoder`.
 
-### Verification Audit
+**Change 1 — `LocoTransformerEncoder.__init__()`, after line 548 (`self.flatten_layer = Flatten()`)**
 
-Inspection of `torchrl/networks/base.py` confirmed that:
+Add the positional embedding parameter:
 
 ```python
-visual_out = torch.cat(out_list, dim=0)
+# After: self.flatten_layer = Flatten()
+
+# Positional embeddings: one per token in the transformer input sequence
+if self.in_channels == 16:
+    total_tokens = 1 + 2 * self.per_modal_tokens
+else:
+    total_tokens = 1 + self.per_modal_tokens
+self.pos_embedding = nn.Parameter(
+    torch.zeros(total_tokens, 1, token_dim)
+)
+nn.init.trunc_normal_(self.pos_embedding, std=0.02)
 ```
 
-directly constructs the transformer input sequence.
+**Change 2 — `LocoTransformerEncoder.forward()`, line 622, replace:**
 
-No positional embeddings, positional encodings, or learnable position parameters were found anywhere in the tokenization pipeline.
+```python
+# ORIGINAL
+visual_out = torch.cat(out_list, dim=0)
 
-The transformer therefore receives token content without explicit positional information.
+# PROPOSED
+visual_out = torch.cat(out_list, dim=0)
+visual_out = visual_out + self.pos_embedding
+```
 
-### Research Basis
-
-Positional embeddings are a foundational component of modern transformer architectures, including:
-
-* Transformer (Vaswani et al.)
-* Vision Transformer (ViT)
-* DeiT
-* BEiT
-* MAE
-* DINO
-
-These methods rely on positional information to allow attention mechanisms to reason about spatial structure and token location.
+The positional embedding tensor has shape `(total_tokens, 1, token_dim)`. The `1` in the
+middle broadcasts correctly across the batch dimension of `visual_out`, which has shape
+`(total_tokens, batch_size, token_dim)`.
 

@@ -107,6 +107,7 @@ class BaseCollector:
     self.eval_env.close()
 
   def train_one_epoch(self):
+    print("ENTER train_one_epoch")
     self.train_rews = []
     self.train_epoch_reward = 0
     self.env.train()
@@ -114,6 +115,7 @@ class BaseCollector:
     for _ in range(self.sample_epoch_frames):
       # Sample actions
       reward = self.take_actions()
+      if _ % 1000 == 0: print("STEP", _)
 
       self.train_epoch_reward += reward
 
@@ -124,6 +126,7 @@ class BaseCollector:
 
   def eval_one_epoch(self):
     eval_infos = {}
+    print("ENTER EVAL")
     eval_rews = []
 
     done = False
@@ -234,8 +237,10 @@ class VecCollector(BaseCollector):
 
   def eval_one_epoch(self):
     eval_infos = {}
+    print("ENTER EVAL")
     eval_rews = []
 
+    print("EVAL START")
     print(self.env._obs_normalizer._mean)
     if hasattr(self.env, "_obs_normalizer"):
       self.eval_env._obs_normalizer = copy.deepcopy(self.env._obs_normalizer)

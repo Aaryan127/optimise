@@ -971,7 +971,7 @@ class LocoTransformer(nn.Module):
       self.second = True
 
     self.visual_append_fcs = []
-    visual_append_input_shape = visual_append_input_shape * 3
+    visual_append_input_shape = visual_append_input_shape * 3 * 2
     if self.second:
       visual_append_input_shape += self.encoder.visual_dim
     for next_shape in append_hidden_shapes:
@@ -1015,9 +1015,11 @@ class LocoTransformer(nn.Module):
     out_state = out[0, ...]
     # rgb_depth_channels = (self.encoder.channel_count - 1) // 2
     # out_rgb = out[1: rgb_depth_channels + 1, ...]
-    out_mean = out[1: 1 + self.per_modal_tokens, ...].mean(dim=0)
-    out_max = out[1: 1 + self.per_modal_tokens, ...].max(dim=0)[0]
-    out_list = [out_state, out_mean, out_max]
+    if self.max_pool:
+      out_first = out[1: 1 + self.per_modal_tokens, ...].max(dim=0)[0]
+    else:
+      out_first = out[1: 1 + self.per_modal_tokens, ...].mean(dim=0)
+    out_list = [out_state, out_first]
     if self.second:
       out_second = out[1 + self.per_modal_tokens: 1 +
                        2 * self.per_modal_tokens, ...]

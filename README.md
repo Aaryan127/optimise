@@ -807,7 +807,7 @@ of two:
 
 ```python
 # ORIGINAL (line 974)
-visual_append_input_shape = visual_append_input_shape * 2
+visual_append_input_shape = visual_append_input_shape * 3 * 2
 
 # PROPOSED
 visual_append_input_shape = visual_append_input_shape * 3

@@ -64,13 +64,15 @@
     },
     "net": {
         "transformer_params": [
-            [2, 512],
-            [2, 512],
-            [2, 512]
+            [
+                1,
+                256
+            ],
+            [
+                1,
+                256
+            ]
         ],
-        "max_pool": true,
-        "token_norm": true,
-        "add_ln": true,
         "append_hidden_shapes": [
             256,
             256

@@ -424,6 +424,16 @@ class TransformerEncoder(nn.Module):
 
     self.flatten_layer = Flatten()
 
+    # Positional embeddings: one per token in the transformer input sequence
+    if self.in_channels == 16:
+      total_tokens = 1 + 2 * self.per_modal_tokens
+    else:
+      total_tokens = 1 + self.per_modal_tokens
+    self.pos_embedding = nn.Parameter(
+      torch.zeros(total_tokens, 1, token_dim)
+    )
+    nn.init.trunc_normal_(self.pos_embedding, std=0.02)
+
   def forward(self, visual_x, detach=False, return_raw_visual_vecs=False):
     if len(visual_x.shape) <= 3:
       visual_x = visual_x.unsqueeze(0)
@@ -547,6 +557,16 @@ class LocoTransformerEncoder(nn.Module):
 
     self.flatten_layer = Flatten()
 
+    # Positional embeddings: one per token in the transformer input sequence
+    if self.in_channels == 16:
+      total_tokens = 1 + 2 * self.per_modal_tokens
+    else:
+      total_tokens = 1 + self.per_modal_tokens
+    self.pos_embedding = nn.Parameter(
+      torch.zeros(total_tokens, 1, token_dim)
+    )
+    nn.init.trunc_normal_(self.pos_embedding, std=0.02)
+
   def forward(self, visual_x, state_x, detach=False, return_raw_visual_vecs=False):
     if len(visual_x.shape) <= 3:
       visual_x = visual_x.unsqueeze(0)
@@ -620,6 +640,7 @@ class LocoTransformerEncoder(nn.Module):
     if self.in_channels == 4 or self.in_channels == 16:
       out_list.append(depth_visual_out)
     visual_out = torch.cat(out_list, dim=0)
+    visual_out = visual_out + self.pos_embedding
 
     if return_raw_visual_vecs:
       return visual_out, state_out, raw_visual_vecs

@@ -754,3 +754,4 @@ The positional embedding tensor has shape `(total_tokens, 1, token_dim)`. The `1
 middle broadcasts correctly across the batch dimension of `visual_out`, which has shape
 `(total_tokens, batch_size, token_dim)`.
 
+                                                                                                                  DONE WITH THE HELP OF CLAUDE OPUS AND CHATGPT 5

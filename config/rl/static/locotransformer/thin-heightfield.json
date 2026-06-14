@@ -64,14 +64,8 @@
     },
     "net": {
         "transformer_params": [
-            [
-                1,
-                256
-            ],
-            [
-                1,
-                256
-            ]
+            [2, 256],
+            [2, 256]
         ],
         "append_hidden_shapes": [
             256,
